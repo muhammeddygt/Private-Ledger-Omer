@@ -387,7 +387,7 @@ details.sv-sum[open] summary{color:var(--text);}
       salaryDefaultByMonth:{},
       salaryMonthly:{},
       debts:[], ekBorclular:[], expenses:[], faturalar:[],
-      offBudgetExpenses:{}, recurringOb:[], sectionOrder:['expenses','faturalar','offbudget','debts','ek','savings'],
+      offBudgetExpenses:{}, recurringOb:[], sectionOrder:['expenses','faturalar','offbudget','kk','kmh','kredi','manuel','ek','savings'],
       savings:{rate:3.1, rateByMonth:{}, deposits:{}},
       gold:{prices:{k22:{alis:0,satis:0}, k24:{alis:0,satis:0}, s1:{fiyat:0, ratio:0, est:false, src:''}, ts:null, src:''}, entries:{}},
       theme:{name:'siyah', accent:'#D4FF3F'}
@@ -649,7 +649,7 @@ details.sv-sum[open] summary{color:var(--text);}
       return Object.assign({endMonthKey:null}, t, {skip:t.skip||{}});
     });
     ensureRecurring(out);
-    out.sectionOrder = Array.isArray(out.sectionOrder) ? out.sectionOrder : ['expenses','faturalar','offbudget','debts','ek','savings'];
+    out.sectionOrder = Array.isArray(out.sectionOrder) ? out.sectionOrder : ['expenses','faturalar','offbudget','kk','kmh','kredi','manuel','ek','savings'];
     var sv = (parsed&&parsed.savings)||{};
     out.savings = {rate:(typeof sv.rate==='number'&&sv.rate>=0)?sv.rate:3.1, rateByMonth:sv.rateByMonth||{}, deposits:sv.deposits||{}};
     var gd = (parsed&&parsed.gold)||{}, gp = gd.prices||{};
@@ -1118,7 +1118,7 @@ details.sv-sum[open] summary{color:var(--text);}
 
   /* ===================== AYLAR EKRANI ===================== */
   var SAVINGS_ON = false; // bu kopyada birikim/altın modülü kapalı
-  var DEFAULT_SECTIONS = ['expenses','faturalar','offbudget','debts','ek'];
+  var DEFAULT_SECTIONS = ['expenses','faturalar','offbudget','kk','kmh','kredi','manuel','ek'];
 
   /* ---------- Birikim (kar payı) ----------
      Ay sonu bakiyesi = önceki bakiye + o ayın kar payı + o ayın yatırımları.
@@ -1355,19 +1355,22 @@ details.sv-sum[open] summary{color:var(--text);}
       '</div></details>';
   }
   function sectionOrder(){
-    var o = Array.isArray(STATE.sectionOrder) ? STATE.sectionOrder.filter(function(id){return DEFAULT_SECTIONS.indexOf(id)>-1;}) : [];
+    var raw = Array.isArray(STATE.sectionOrder) ? STATE.sectionOrder : [];
+    var o = [];
+    raw.forEach(function(id){ if(id==='debts'){ ['kk','kmh','kredi','manuel'].forEach(function(x){ o.push(x); }); } else o.push(id); });
+    o = o.filter(function(id){return DEFAULT_SECTIONS.indexOf(id)>-1;});
     DEFAULT_SECTIONS.forEach(function(id){ if(o.indexOf(id)===-1) o.push(id); });
     return o.filter(function(id,i){return o.indexOf(id)===i;});
   }
   function sectionsHtml(key){
-    var map = {expenses:renderGiderlerAcc, faturalar:renderFaturalarAcc, offbudget:renderOffBudgetAcc, debts:renderDebtGroupsAcc, ek:renderEkBorclularAcc, savings:renderSavingsAcc};
+    var map = {expenses:renderGiderlerAcc, faturalar:renderFaturalarAcc, offbudget:renderOffBudgetAcc, kk:function(k){return renderDebtGroupsAcc(k,'kk');}, kmh:function(k){return renderDebtGroupsAcc(k,'kmh');}, kredi:function(k){return renderDebtGroupsAcc(k,'kredi');}, manuel:function(k){return renderDebtGroupsAcc(k,'manuel');}, ek:renderEkBorclularAcc, savings:renderSavingsAcc};
     return sectionOrder().map(function(id){ return map[id](key); }).join('');
   }
   function secMoveHtml(id){
     return '<span class="move-btns h" style="margin-right:4px;"><button type="button" class="move-btn" data-action="sec-move" data-id="'+id+'" data-dir="-1" title="Bölümü yukarı al">▲</button><button type="button" class="move-btn" data-action="sec-move" data-id="'+id+'" data-dir="1" title="Bölümü aşağı al">▼</button></span>';
   }
   var ACC_KEY = 'abiLedger_acc';
-  var _accOpen = (function(){ try{ var o = JSON.parse(localStorage.getItem(ACC_KEY)||'null'); if(o && typeof o==='object') return o; }catch(e){} return {debts:true}; })();
+  var _accOpen = (function(){ try{ var o = JSON.parse(localStorage.getItem(ACC_KEY)||'null'); if(o && typeof o==='object'){ if(o.kk===undefined && o.debts!==undefined){ o.kk=o.kmh=o.kredi=o.manuel=!!o.debts; } return o; } }catch(e){} return {kk:true,kmh:true,kredi:true,manuel:true}; })();
   function persistAcc(){ try{ localStorage.setItem(ACC_KEY, JSON.stringify(_accOpen)); }catch(e){} }
   function captureAcc(){
     var ds = document.getElementById('s-ay').querySelectorAll('details[data-acc]');
@@ -1454,6 +1457,7 @@ details.sv-sum[open] summary{color:var(--text);}
     return {gelir:gelir, debtDue:debtDue, faturaTotal:faturaTotal, expTotal:expTotal, offTotal:offTotal, savDep:savDep, goldNet:goldNet, netKalan:netKalan};
   }
 
+  var salBulkMsg = '';
   function renderSalaryAcc(key){
     var pazarGun = (STATE.salaryMonthly[key]&&STATE.salaryMonthly[key].pazarGun)||0;
     var mesaiSaat = (STATE.salaryMonthly[key]&&STATE.salaryMonthly[key].mesaiSaat)||0;
@@ -1470,6 +1474,20 @@ details.sv-sum[open] summary{color:var(--text);}
             '<div class="pm-row"><span class="pm-lbl">Pazar günü<small>'+fmtShort(pazarRate)+'/gün</small></span><div class="stepper"><button data-action="pm-step" data-field="pazarGun" data-key="'+key+'" data-d="-1">−</button><input data-action="pm-set" data-field="pazarGun" data-key="'+key+'" value="'+pazarGun+'"><button data-action="pm-step" data-field="pazarGun" data-key="'+key+'" data-d="1">+</button></div></div>'+
             '<div class="pm-row"><span class="pm-lbl">Mesai saati<small>'+fmtShort(mesaiRate)+'/saat</small></span><div class="stepper"><button data-action="pm-step" data-field="mesaiSaat" data-key="'+key+'" data-d="-1">−</button><input data-action="pm-set" data-field="mesaiSaat" data-key="'+key+'" value="'+mesaiSaat+'"><button data-action="pm-step" data-field="mesaiSaat" data-key="'+key+'" data-d="1">+</button></div></div>'+
             '<div class="pm-row"><span class="pm-lbl">Gün/saat ücreti<small>bu ay için</small></span><div style="display:flex; gap:5px;"><input class="mini-input" style="width:64px;" data-action="sal-field" data-field="pazarRate" data-key="'+key+'" value="'+editVal(pazarRate)+'"><input class="mini-input" style="width:64px;" data-action="sal-field" data-field="mesaiRate" data-key="'+key+'" value="'+editVal(mesaiRate)+'"></div></div>'+
+          '</div>'+
+        '</details>'+
+        '<details class="acc-sub" data-acc="salbulk"><summary><span>Toplu ekle · birden çok aya uygula</span><span class="edit-pill">＋</span></summary>'+
+          '<div class="pm-detail">'+
+            '<div class="year-note" style="margin:0 0 6px;">Doldurduğun alanlar, seçtiğin aydan başlayarak kaç ay yazarsan o kadar aya yazılır (o aylardaki eski değerlerin üzerine). Boş bıraktığın alana dokunulmaz.</div>'+
+            '<div class="pm-row"><span class="pm-lbl">Başlangıç ayı</span><select class="mini-input" id="salBulkFrom" style="width:auto;">'+keysBetween(EPOCH_KEY, addMonths(EPOCH_KEY,71)).map(function(k){ return '<option value="'+k+'"'+(k===key?' selected':'')+'>'+monthNameFromKey(k)+' '+yearFromKey(k)+'</option>'; }).join('')+'</select></div>'+
+            '<div class="pm-row"><span class="pm-lbl">Kaç ay<small>1–60</small></span><input class="mini-input" id="salBulkN" inputmode="numeric" style="width:64px;" value="12"></div>'+
+            '<div class="pm-row"><span class="pm-lbl">Net Maaş</span><input class="mini-input" id="salBulkNet" inputmode="decimal" style="width:96px;" placeholder="—"></div>'+
+            '<div class="pm-row"><span class="pm-lbl">Sendika</span><input class="mini-input" id="salBulkSend" inputmode="decimal" style="width:96px;" placeholder="—"></div>'+
+            '<div class="pm-row"><span class="pm-lbl">Aile Yardımı</span><input class="mini-input" id="salBulkAile" inputmode="decimal" style="width:96px;" placeholder="—"></div>'+
+            '<div class="pm-row"><span class="pm-lbl">Pazar günü ücreti</span><input class="mini-input" id="salBulkPR" inputmode="decimal" style="width:96px;" placeholder="—"></div>'+
+            '<div class="pm-row"><span class="pm-lbl">Mesai saat ücreti</span><input class="mini-input" id="salBulkMR" inputmode="decimal" style="width:96px;" placeholder="—"></div>'+
+            '<button class="xfer-btn" data-action="sal-bulk" style="margin-top:6px;">Seçili aylara uygula</button>'+
+            (salBulkMsg?'<div class="year-note" style="margin-top:6px; color:var(--acc);">'+salBulkMsg+'</div>':'')+
           '</div>'+
         '</details>'+
         '<div class="year-note">Her alan bu aya özel — değiştirirsen sadece '+monthNameFromKey(key)+' etkilenir, diğer aylar kendi değerinde kalır.</div>'+
@@ -1493,8 +1511,20 @@ details.sv-sum[open] summary{color:var(--text);}
   }
   function turLabel(t){ return t==='kredi_karti'?'K.KARTI':(t==='kmh'?'KMH':(t==='kredi'?'KREDİ':'MANUEL')); }
 
-  function renderDebtGroupsAcc(key){
-    var list = sortedVisibleDebts();
+  var DEBT_SECS = {kk:'kredi_karti', kmh:'kmh', kredi:'kredi', manuel:'manuel'};
+  var DEBT_SEC_META = {kk:{ico:'💳', name:'Kredi Kartları'}, kmh:{ico:'🏦', name:'KMH Hesapları'}, kredi:{ico:'🏷️', name:'Krediler'}, manuel:{ico:'✍️', name:'Manuel Takip'}};
+  function debtGroupHas(tur){ return STATE.debts.some(function(d){ return !d.hidden && d.tur===tur; }); }
+  function debtSecVisible(id){
+    var tur = DEBT_SECS[id];
+    if(debtGroupHas(tur)) return true;
+    // hiç borç yoksa, ekleme yolu kalsın diye yalnız Kredi Kartları bölümü görünür
+    return id==='kk' && !Object.keys(DEBT_SECS).some(function(i){ return debtGroupHas(DEBT_SECS[i]); });
+  }
+  function renderDebtGroupsAcc(key, secId){
+    var tur0 = DEBT_SECS[secId];
+    if(!debtSecVisible(secId)) return '';
+    var firstShown = Object.keys(DEBT_SECS).filter(debtSecVisible)[0]===secId;
+    var list = sortedVisibleDebts().filter(function(d){ return d.tur===tur0; });
     var groupTotalsM = {};
     list.forEach(function(d){
       if(absIndexFromKey(key) < absIndexFromKey(d.startMonthKey)) return;
@@ -1507,11 +1537,6 @@ details.sv-sum[open] summary{color:var(--text);}
 
     var lastTur = null, body = '';
     list.forEach(function(d){
-      if(d.tur !== lastTur){
-        lastTur = d.tur;
-        var gt = groupTotalsM[d.tur]||{payment:0,balance:0};
-        body += '<div class="section-title" style="margin:16px 0 8px; font-size:10.5px;">'+GROUP_LABELS[d.tur]+' <span style="color:var(--text-faint); font-family:var(--font-num); text-transform:none;">('+fmtShort(gt.payment).replace(' TL','')+'/'+fmtShort(gt.balance).replace(' TL','')+')</span></div>';
-      }
       if(absIndexFromKey(key) < absIndexFromKey(d.startMonthKey)){
         body += '<div class="debt-card" style="opacity:.4;"><div class="debt-top"><div class="debt-id"><span class="debt-name-input">'+esc(d.ad)+'</span></div></div><div style="font-size:10px; color:var(--text-faint); margin-top:4px;">henüz başlamadı</div></div>';
         return;
@@ -1557,11 +1582,12 @@ details.sv-sum[open] summary{color:var(--text);}
         (rateFields ? '<div class="rate-pop" id="rp_'+d.id+'">'+rateFields+'</div>' : '')+
       '</div>';
     });
-    return '<details class="acc" data-acc="debts"><summary><span class="acc-name"><span class="acc-ico">💳</span>Krediler &amp; Kartlar</span><span class="acc-right"><span class="acc-amt">'+fmtShort(totalPay)+'</span>'+secMoveHtml('debts')+'<span class="acc-chev">›</span></span></summary>'+
+    var meta = DEBT_SEC_META[secId];
+    return '<details class="acc" data-acc="'+secId+'"><summary><span class="acc-name"><span class="acc-ico">'+meta.ico+'</span>'+meta.name+'</span><span class="acc-right"><span class="acc-amt">'+fmtShort(totalPay)+'</span>'+secMoveHtml(secId)+'<span class="acc-chev">›</span></span></summary>'+
       '<div class="acc-body">'+
         '<div class="year-note" style="margin-top:10px;">Bu ay ödenecek <b>'+fmtShort(totalPay)+'</b> · ödenince kalan <b>'+fmtShort(totalBal)+'</b></div>'+
-        body+hiddenPanelHtml()+
-        '<button class="add-row-btn" data-action="open-add-debt">+ Borç Ekle</button><div id="addDebtSlot"></div>'+
+        body+(firstShown?hiddenPanelHtml():'')+
+        '<button class="add-row-btn" data-action="open-add-debt" data-tur="'+tur0+'">+ Borç Ekle</button><div id="addDebtSlot_'+secId+'"></div>'+
       '</div></details>';
   }
 
@@ -1732,10 +1758,17 @@ details.sv-sum[open] summary{color:var(--text);}
         '<label>Başlangıç ayı<select '+f+' data-field="startMonthKey">'+startOptions(d.startMonthKey)+'</select></label>';
       if(d.tur==='kredi') fields += '<label>Aylık taksit (varsayılan)<input type="text" inputmode="decimal" '+f+' data-field="taksit" value="'+editVal(d.taksit)+'"></label>';
       if(d.tur==='kredi_karti') fields += '<label>Asgari % (varsayılan)<input type="text" inputmode="decimal" '+f+' data-field="asgariYuzde" value="'+editVal(d.asgariYuzde)+'"></label>';
+      if(d.tur==='kredi_karti' || d.tur==='kmh') fields += '<label>Limit (0 = yok)<input type="text" inputmode="decimal" '+f+' data-field="limit" value="'+editVal(d.limit)+'"></label>';
       if(d.tur==='kredi_karti' || d.tur==='kmh') fields += '<label>Faiz % (varsayılan)<input type="text" inputmode="decimal" '+f+' data-field="faizYuzde" value="'+editVal(d.faizYuzde)+'"></label>';
+      var limHtml = '';
+      if((d.tur==='kredi_karti'||d.tur==='kmh') && Number(d.limit)>0){
+        var used = Math.max(0,bal), lim = Number(d.limit), over = used-lim;
+        var lp = Math.round(used/lim*100);
+        limHtml = '<div class="debt-sub" style="'+(over>0?'color:var(--red);':'')+'">limit '+fmtShort(lim)+' · '+(over>0 ? 'limit aşımı '+fmtShort(over)+' (%'+lp+')' : 'kalan limit '+fmtShort(lim-used)+' (%'+lp+' dolu)')+'</div>';
+      }
       var done = bal<=0 && absIndexFromKey(d.startMonthKey) <= absIndexFromKey(closedUpto);
       return '<div class="debt-card"><div class="debt-top"><div style="min-width:0;"><div class="debt-name-input" style="font-weight:600;">'+esc(d.ad)+(done?' <span style="color:var(--acc); font-size:10px;">✓ bitti</span>':'')+'</div><div class="debt-badge">'+badge+' · başlangıç '+monthNameFromKey(d.startMonthKey)+' '+yearFromKey(d.startMonthKey)+'</div></div>'+
-        '<div class="debt-bal">'+pill+fmt(bal)+'<div class="debt-sub">başlangıç '+fmtShort(d.baslangic)+'</div></div></div>'+
+        '<div class="debt-bal">'+pill+fmt(bal)+'<div class="debt-sub">başlangıç '+fmtShort(d.baslangic)+'</div>'+limHtml+'</div></div>'+
         '<div class="prog-track"><div class="prog-fill" style="width:'+p+'%"></div></div>'+
         '<div class="debt-foot"><span class="edit-pill" data-action="toggle-rate-pop" data-for="ed_'+d.id+'">✎</span><span class="pct">%'+p+' ödendi'+leftTxt+'</span><span style="flex:1"></span>'+
           '<span class="move-btns h">'+moveBtnsInner(listName,d.id)+'</span>'+
@@ -1817,13 +1850,14 @@ details.sv-sum[open] summary{color:var(--text);}
       '<div class="fr"><label>Başlangıç ayı</label><select id="ndStart">'+(function(){ var sel=defKey||homeKey(), o=''; for(var i=0;i<60;i++){ var k=keyFromAbsIndex(i); o+='<option value="'+k+'"'+(k===sel?' selected':'')+'>'+monthNameFromKey(k)+' '+yearFromKey(k)+'</option>'; } return o; })()+'</select></div>'+
       '<div class="fr"><label>Güncel Borç</label><input type="text" inputmode="decimal" id="ndBaslangic" placeholder="0,00"></div>'+
       '<div class="fr" id="ndKKRow"><label>Asgari % / Faiz %</label><span style="display:flex; gap:6px;"><input type="text" inputmode="decimal" id="ndAsgari" value="20" style="width:52px;"><input type="text" inputmode="decimal" id="ndFaiz" value="5" style="width:52px;"></span></div>'+
+      '<div class="fr" id="ndLimitRow"><label>Kart limiti<small style="color:var(--text-faint);"> (isteğe bağlı)</small></label><input type="text" inputmode="decimal" id="ndLimit" placeholder="0,00"></div>'+
       '<div class="fr" id="ndKMHRow" style="display:none;"><label>Aylık Faiz %</label><input type="text" inputmode="decimal" id="ndKmhFaiz" value="5" style="width:52px;"></div>'+
       '<div class="fr" id="ndKrediRow" style="display:none;"><label>Aylık Taksit</label><span style="display:flex; gap:6px; flex:1; min-width:0; justify-content:flex-end;"><input type="text" inputmode="decimal" id="ndTaksit" placeholder="0,00" style="flex:1; min-width:0;"><input type="text" inputmode="numeric" id="ndTaksitSayi" placeholder="adet" title="Taksit sayısı" style="width:56px; flex:none; text-align:center;"></span></div>'+
       '<div id="ndKrediHint" style="display:none; font-size:10px; color:var(--text-faint); margin:-2px 0 6px; text-align:right;">Borç, taksit tutarı ve adetten ikisini yaz, üçüncüsü otomatik hesaplanır.</div>'+
       '<div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;"><button class="sheet-close" style="width:auto; padding:8px 14px; margin:0;" id="ndCancel">Vazgeç</button><button class="xfer-btn" style="padding:8px 14px;" id="ndSave">Ekle</button></div>'+
     '</div>';
   }
-  function wireAddDebtForm(slotId, defKey){
+  function wireAddDebtForm(slotId, defKey, defTur){
     var slot = document.getElementById(slotId);
     slot.innerHTML = addDebtFormHtml(defKey);
     var turSel = document.getElementById('ndTur');
@@ -1831,7 +1865,9 @@ details.sv-sum[open] summary{color:var(--text);}
       document.getElementById('ndKKRow').style.display = turSel.value==='kredi_karti'?'flex':'none';
       document.getElementById('ndKMHRow').style.display = turSel.value==='kmh'?'flex':'none';
       document.getElementById('ndKrediRow').style.display = turSel.value==='kredi'?'flex':'none';
+      document.getElementById('ndLimitRow').style.display = (turSel.value==='kredi_karti'||turSel.value==='kmh')?'flex':'none';
     });
+    if(defTur){ turSel.value = defTur; turSel.dispatchEvent(new Event('change')); }
     /* Kredi: borç / taksit tutarı / taksit adedinden ikisi girilince üçüncüsü hesaplanır */
     var kFields = {borc:document.getElementById('ndBaslangic'), taksit:document.getElementById('ndTaksit'), adet:document.getElementById('ndTaksitSayi')};
     var kTouched = [];
@@ -1862,6 +1898,7 @@ details.sv-sum[open] summary{color:var(--text);}
       var nd = {id:uid(), ad:ad, tur:tur, baslangic:baslangic, startMonthKey:(document.getElementById('ndStart')||{}).value||homeKey(), payments:{}, balanceOverrides:{}, additions:{}, paidMonths:{}, missedMonths:{}, hidden:false, sortOrder:STATE.debts.length};
       if(tur==='kredi_karti'){ nd.asgariYuzde=parseNum(document.getElementById('ndAsgari').value)||20; nd.faizYuzde=parseNum(document.getElementById('ndFaiz').value)||5; }
       else if(tur==='kmh'){ nd.faizYuzde=parseNum(document.getElementById('ndKmhFaiz').value)||5; }
+      if(tur==='kredi_karti'||tur==='kmh'){ var lm=parseNum(document.getElementById('ndLimit').value); if(lm>0) nd.limit=lm; }
       else if(tur==='kredi'){ nd.taksit=parseNum(document.getElementById('ndTaksit').value)||baslangic; }
       STATE.debts.push(nd);
       save(); renderAll();
@@ -2258,6 +2295,20 @@ details.sv-sum[open] summary{color:var(--text);}
       if(gdi>-1){ gdl.splice(gdi,1); save(); renderAll(); }
       return;
     }
+    if(action==='sal-bulk'){
+      var gv = function(id){ var e=document.getElementById(id); return e?String(e.value).trim():''; };
+      var fromK = gv('salBulkFrom'), nM = Math.round(parseNum(gv('salBulkN'))||0);
+      if(!fromK || nM<1 || nM>60){ salBulkMsg='Kaç ay alanına 1 ile 60 arasında bir sayı yaz.'; renderAll(); return; }
+      var fields = [['netMaas','salBulkNet'],['sendika','salBulkSend'],['aile','salBulkAile'],['pazarRate','salBulkPR'],['mesaiRate','salBulkMR']]
+        .map(function(f){ return [f[0], gv(f[1])]; }).filter(function(f){ return f[1]!==''; });
+      if(!fields.length){ salBulkMsg='En az bir tutar yaz.'; renderAll(); return; }
+      keysBetween(fromK, addMonths(fromK, nM-1)).forEach(function(k){
+        fields.forEach(function(f){ setSalaryField(STATE, f[0], k, parseNum(f[1])); });
+      });
+      var toK = addMonths(fromK, nM-1);
+      salBulkMsg = '✓ '+monthNameFromKey(fromK)+' '+yearFromKey(fromK)+' – '+monthNameFromKey(toK)+' '+yearFromKey(toK)+' ('+nM+' ay) güncellendi.';
+      save(); renderAll(); return;
+    }
     if(action==='sv-add'){
       var inp = document.getElementById('svNew'), amt = parseNum(inp?inp.value:'');
       if(!amt){ if(inp) inp.focus(); return; }
@@ -2292,9 +2343,9 @@ details.sv-sum[open] summary{color:var(--text);}
     }
     if(action==='open-add-debt'){
       var scr = t.closest('.screen');
-      var slotEl = scr && scr.querySelector('[id^="addDebtSlot"]');
-      ['addDebtSlot','addDebtSlot2'].forEach(function(id){ var e = document.getElementById(id); if(e) e.innerHTML=''; });
-      if(slotEl) wireAddDebtForm(slotEl.id, scr.id==='s-ay' ? currentMonthKey : homeKey());
+      var slotEl = (t.nextElementSibling && /^addDebtSlot/.test(t.nextElementSibling.id)) ? t.nextElementSibling : (scr && scr.querySelector('[id^="addDebtSlot"]'));
+      document.querySelectorAll('[id^="addDebtSlot"]').forEach(function(e){ e.innerHTML=''; });
+      if(slotEl) wireAddDebtForm(slotEl.id, scr.id==='s-ay' ? currentMonthKey : homeKey(), t.dataset.tur||'');
       return;
     }
     if(action==='month-prev'){ currentMonthKey = addMonths(currentMonthKey,-1); currentPickerYear = yearFromKey(currentMonthKey); renderAll(); return; }
